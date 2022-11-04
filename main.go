@@ -112,6 +112,7 @@ func wsWriter(ws *websocket.Conn) {
 			}
 			websocket.Message.Send(ws, string(sendData))
 			lastCommand = command
+			fmt.Println(command)
 		}
 	}
 }
