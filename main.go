@@ -85,7 +85,7 @@ func wsReceiver(ws *websocket.Conn) {
 		}
 		mu.Unlock()
 
-		//fmt.Printf("Received: %v %v \n", mess, field.data)
+		fmt.Printf("Received: %v %v \n", mess, field.data)
 	}
 
 }
