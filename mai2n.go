@@ -1,13 +1,14 @@
-package main
+package ma2in
 
 import (
 	"encoding/json"
 	"fmt"
-	"golang.org/x/net/websocket"
 	"log"
 	"net/http"
 	"reflect"
 	"sync"
+
+	"golang.org/x/net/websocket"
 )
 
 type MessageReceive struct {
