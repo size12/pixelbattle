@@ -2,59 +2,95 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
-	"io"
+	"log"
 	"net/http"
 	"pixelBattle/internal/entity"
 	"pixelBattle/internal/storage"
+	"time"
+
+	"golang.org/x/net/websocket"
 )
 
-func NewDrawDotHandler(s storage.Storage) http.HandlerFunc {
+func NewClearHandler(s storage.Storage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		resBody, err := io.ReadAll(r.Body)
-		defer r.Body.Close()
-
+		err := s.ClearField()
 		if err != nil {
-			http.Error(w, "wrong body: "+err.Error(), http.StatusBadRequest)
+			log.Println("Failed clear field: ", err)
+			http.Error(w, "Failed clear field", http.StatusInternalServerError)
 			return
 		}
-
-		dot := entity.Dot{}
-		err = json.Unmarshal(resBody, &dot)
-
-		if err != nil {
-			http.Error(w, "Failed unmarshal your request.", http.StatusBadRequest)
-			return
-		}
-
-		err = s.DrawDot(&dot)
-
-		if errors.Is(err, storage.ErrOutFieldBorder) {
-			http.Error(w, "Bad coordinates. Failed draw dot", http.StatusUnprocessableEntity)
-			return
-		}
-
-		if err != nil {
-			http.Error(w, "Failed draw dot.", http.StatusInternalServerError)
-			return
-		}
-
 		w.WriteHeader(http.StatusAccepted)
 		return
 	}
 }
 
-func NewGetFieldHandler(s storage.Storage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		field, err := s.GetField()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
+func GetReceiveMessagesChan(ws *websocket.Conn) chan []byte {
+	var message []byte
+	result := make(chan []byte, 2)
 
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(fmt.Sprint(field)))
-		return
+	go func() {
+		for {
+			err := websocket.Message.Receive(ws, &message)
+			if err != nil {
+				ws.Close()
+				return
+			}
+			result <- message
+		}
+	}()
+
+	return result
+
+}
+
+func NewDrawHandler(s storage.Storage) websocket.Handler {
+	return func(ws *websocket.Conn) {
+		cfg := s.GetConfig()
+		ticker := time.NewTicker(cfg.UpdateTime)
+
+		messages := GetReceiveMessagesChan(ws)
+		defer close(messages)
+
+		for {
+			select {
+			case <-ticker.C:
+				field, err := s.GetField()
+				if err != nil {
+					log.Println("Failed get field: ", err)
+					ws.Write([]byte("Failed get field"))
+					ws.Close()
+					return
+				}
+
+				b, err := json.Marshal(&field)
+				if err != nil {
+					log.Println("Failed marshal field: ", err)
+					ws.Write([]byte("Failed marshal field"))
+					ws.Close()
+					return
+				}
+
+				_, err = ws.Write(b)
+
+				if err != nil {
+					log.Println("Failed write to websocket: ", err)
+					return
+				}
+			case message := <-messages:
+				dot := entity.Dot{}
+				err := json.Unmarshal(message, &dot)
+
+				if err != nil {
+					ws.Write([]byte("400"))
+					continue
+				}
+
+				err = s.DrawDot(&dot)
+				if err != nil {
+					ws.Write([]byte("Error: " + err.Error()))
+					continue
+				}
+			}
+		}
 	}
 }

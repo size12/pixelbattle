@@ -31,7 +31,7 @@ func (s *ArrayStorage) DrawDot(dot *entity.Dot) error {
 		return ErrOutFieldBorder
 	}
 
-	s.Field[dot.Y-1][dot.X-1] = dot.Color
+	s.Field[dot.Y][dot.X] = dot.Color
 
 	return nil
 }
@@ -41,4 +41,23 @@ func (s *ArrayStorage) GetField() (entity.Field, error) {
 	defer s.RUnlock()
 
 	return s.Field, nil
+}
+
+func (s *ArrayStorage) ClearField() error {
+	s.Lock()
+	defer s.Unlock()
+
+	size := s.Cfg.FieldSize
+
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+			s.Field[i][j] = 0
+		}
+	}
+
+	return nil
+}
+
+func (s *ArrayStorage) GetConfig() *config.Config {
+	return s.Cfg
 }

@@ -3,12 +3,13 @@ package service
 import (
 	"log"
 	"net/http"
+	"net/url"
 	"pixelBattle/internal/config"
 	"pixelBattle/internal/handlers"
-	"pixelBattle/internal/middleware"
 	"pixelBattle/internal/storage"
 
 	"github.com/go-chi/chi/v5"
+	"golang.org/x/net/websocket"
 )
 
 type Service struct {
@@ -39,12 +40,16 @@ func (service *Service) Run() error {
 
 	server := http.Server{Addr: service.Cfg.RunAddress, Handler: r}
 
-	r.Group(func(r chi.Router) {
-		r.Use(middleware.OnlyJSONContent)
-		r.Post("/draw", handlers.NewDrawDotHandler(s))
-	})
+	URL, err := url.Parse("http://localhost:8080")
 
-	r.Get("/draw", handlers.NewGetFieldHandler(s))
+	if err != nil {
+		log.Fatalln("Failed parse url: ", err)
+	}
+
+	config := websocket.Config{Origin: URL}
+
+	r.Handle("/draw", websocket.Server{Handler: handlers.NewDrawHandler(s), Config: config})
+	r.Get("/clear", handlers.NewClearHandler(s))
 	r.MethodNotAllowedHandler()
 
 	return server.ListenAndServe()

@@ -8,6 +8,8 @@ import (
 type Storage interface {
 	DrawDot(dot *entity.Dot) error
 	GetField() (entity.Field, error)
+	ClearField() error
+	GetConfig() *config.Config
 }
 
 func NewStorage(cfg *config.Config) (Storage, error) {
