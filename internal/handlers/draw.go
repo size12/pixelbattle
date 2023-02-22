@@ -2,7 +2,9 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
+	"net"
 	"net/http"
 	"pixelBattle/internal/entity"
 	"pixelBattle/internal/storage"
@@ -71,6 +73,12 @@ func NewDrawHandler(s storage.Storage) websocket.Handler {
 				}
 
 				_, err = ws.Write(b)
+
+				if errors.Is(err, net.ErrClosed) {
+					// user disconnected
+					ws.Close()
+					return
+				}
 
 				if err != nil {
 					log.Println("Failed write to websocket: ", err)
